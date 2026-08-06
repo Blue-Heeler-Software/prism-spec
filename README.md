@@ -41,7 +41,10 @@ configurations are proven through a camera and which are only defined.
 This is a working specification, not yet a frozen standard.
 
 - The symbol format at one bit per channel, and the Aphotic file transfer on top
-  of it, are proven on real handsets.
+  of it, are proven on real handsets, including through a public video
+  platform's transcode: a paired version 6 H configuration was received by
+  every camera tested at every playback quality from 720p up. Section 0 of the
+  format records the measured envelope.
 - Higher bit depths, and format version 3's per-channel loading, are defined but
   have not decoded from a camera. Section 0 of the format is explicit about this.
 - Prism Stream's transport is implemented and unit-tested but has not yet been

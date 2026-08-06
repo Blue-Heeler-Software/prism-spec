@@ -55,6 +55,43 @@ format version 2 at `b = 1`. A conformance claim MUST state which
 configurations it was tested against, and MUST NOT imply that a configuration
 decodes from a camera merely because it round-trips losslessly in software.
 
+### The measured operating envelope
+
+A fleet test was run through a public video platform's transcode at several
+playback resolutions, against a local playback control, using videos that carry
+the same file at many encodings at once so each phone's first received file
+names the densest configuration its whole chain supports. The numbers below are
+from that test, on a 1080p source canvas; they are evidence, not requirements.
+
+* **The proven universal operating point is a side-by-side pair of version 6
+  symbols at correction H, one bit per channel, modules about 9 pixels on a
+  1080p canvas** (4.5 chroma pixels per module after subsampling). Every camera
+  tested received it, at every playback quality from 720p up, at both a 150 ms
+  and a 100 ms page dwell. On the weakest cameras dwell was not the constraint;
+  module size was.
+* **Compression damage and camera damage do not add; the worse of the two
+  governs.** At high playback quality the transcode was transparent, with every
+  phone matching its local control exactly. At 720p only the strongest camera
+  paid a density toll, because only it had been operating past what the codec
+  preserves; the weaker cameras' own optics already filtered harder.
+* **480p playback killed every configuration tested**, including the universal
+  pair. A 1080p canvas downscaled that far leaves roughly two chroma samples
+  per module on even the sparsest rung.
+* **Dense configurations have no stable margin.** Version 20 at correction M in
+  a pair, 2.0 chroma pixels per module, was received by the best camera in one
+  orientation and not in another. A configuration that survives only in one
+  orientation on the best hardware is a stunt, not an operating point.
+* **Static symbols obey the same physics with the clock removed**: a version 10
+  M still at 13 pixel modules read on every camera at 720p and up; 8 pixel and
+  4 pixel stills read on none, though all decode losslessly from the file.
+* One anomaly is recorded rather than resolved: single-symbol video parts
+  failed on every phone in one test session while pairs with SMALLER modules
+  passed alongside them, and the singles decode cleanly from the compressed
+  file. The signal was intact, so the suspicion falls on the reference reader's
+  video pipeline. Until it is isolated, the pair is the proven arrangement for
+  video-embedded transfers and single-symbol video profiles should be treated
+  as unverified.
+
 Lossless software round-tripping of `b = 2`, `b = 3` and the version 3 profiles
 does work, and is covered by the encoder and core decoder conformance classes in
 section 8. That is a statement about the codec, not about optics.
