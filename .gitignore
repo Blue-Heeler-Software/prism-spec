@@ -1,0 +1,2 @@
+# Session transcripts and any stray text logs never belong in the spec repo.
+*.txt
