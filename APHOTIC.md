@@ -31,12 +31,19 @@ bytes: `PS` for an Aphotic page, `PV` for a stream frame, neither for a document
 header, not over a page body, not over the assembled file. It relies entirely on
 the symbol layer beneath it:
 
-> A Prism symbol is Reed-Solomon protected and CRC-32 checked, so a decoded page
-> is **byte-exact or absent**, never corrupt. Aphotic is built on that guarantee
-> and would be unsafe without it. In particular, several of the rules below note
-> failures that "nothing downstream would catch, because the assembled file
-> carries no checksum": those are consequences of this choice, and an
-> implementation MUST honour the bounds that prevent them.
+> A Prism symbol is Reed-Solomon protected and CRC-32 checked, so a damaged
+> page is either repaired exactly or, overwhelmingly, rejected: delivering a
+> corrupt page requires damage that both survives Reed-Solomon decoding and
+> then passes a 32-bit check by chance, roughly one in four billion per damaged
+> symbol. Aphotic is built on that near-guarantee and would be unsafe without
+> it. The residual risk is stated because a specification should not print
+> "never", and CRC-32 authenticates nothing: an application that needs
+> certainty about the assembled file, or integrity against an adversary rather
+> than against noise, MUST carry its own digest or signature inside the
+> payload. Several of the rules below note failures that "nothing downstream
+> would catch, because the assembled file carries no checksum": those are
+> consequences of this choice, and an implementation MUST honour the bounds
+> that prevent them.
 
 ## 2. The page header
 
@@ -62,11 +69,15 @@ bytes and every symbol of the loop is the same shape.
   above for repair pages, in the same 16-bit field.
 - **data page count** is the number of *data* pages only, not the total. A
   reader derives the total when it needs it.
-- **total file length** is the original file size, which trims the final chunk's
-  zero padding on reassembly. The field is 32 bits wide but carried as a signed
-  value, so a file is at least 1 byte and at most `0x7FFFFFFF` bytes, about 2 GiB.
-  A sender MUST NOT set the high bit; a reader MUST reject a length that is zero
-  or negative.
+- **total length** is the byte count of the **transfer payload**: the file with
+  its optional name envelope (section 7) already prepended. The envelope is
+  applied BEFORE chunking, so this field counts it; a reader reassembles exactly
+  this many bytes, trimming the final chunk's zero padding, and only then opens
+  the envelope. A field that counted the bare file would make reassembly cut
+  the file short by the envelope's length. The field is 32 bits wide but
+  carried as a signed value, so the payload is at least 1 byte and at most
+  `0x7FFFFFFF` bytes, about 2 GiB. A sender MUST NOT set the high bit; a reader
+  MUST reject a length that is zero or negative.
 - **repair mode**, byte 8, selects how lost pages are recovered:
 
 | value | meaning |
@@ -75,21 +86,29 @@ bytes and every symbol of the loop is the same shape.
 | 1..254 | fixed parity: one XOR parity page per this many data pages |
 | 255 (`0xFF`) | rateless: repair pages are a fountain (section 5) |
 
-The chunk size is not transmitted. A reader learns it as `pageSize - 13` from any
-page, and MUST reject a page whose chunk size disagrees with a transfer already
-in progress.
+The chunk size is not transmitted. A reader learns it as `pageSize - 13` from
+any page. All pages of one transfer MUST carry identical header fields apart
+from the page index, and a reader MUST reject a page whose chunk size, data
+page count, repair mode or total length disagrees with the transfer already in
+progress: such a page is a corrupt read that survived its checks, or two
+senders colliding on an id, and mixing it in would poison a reassembly that
+carries no checksum of its own. A reader SHOULD also reject a transfer whose
+fields are internally inconsistent, `dataPages != ceil(totalLength / chunkSize)`
+being the canonical check.
 
 `chunkSize` MUST be at least 32 bytes.
 
 ## 3. Chunking and the systematic pass
 
 ```
-dataPages = ceil(fileLength / chunkSize)          fileLength >= 1
-chunk[i]  = fileLength bytes [i*chunkSize, (i+1)*chunkSize), the last zero-padded to chunkSize
+payload   = envelope || file          when a name rides along (section 7)
+          = file                      otherwise
+dataPages = ceil(len(payload) / chunkSize)        len(payload) >= 1
+chunk[i]  = payload bytes [i*chunkSize, (i+1)*chunkSize), the last zero-padded to chunkSize
 ```
 
-An empty file is out of scope; a transfer carries at least one byte and therefore
-at least one data page.
+An empty payload is out of scope; a transfer carries at least one byte and
+therefore at least one data page.
 
 The **systematic pass** is the file sent once in order: for `i` in
 `0 .. dataPages-1`, a page with index `i` whose body is `chunk[i]` verbatim. Both
@@ -260,10 +279,15 @@ trimmed to the total length field.
 
 ## 7. The envelope: carrying a file name
 
-A file name rides **once**, in front of the payload, inside chunk 0, so a reader
+A file name rides **once**, in front of the file, inside chunk 0, so a reader
 can show it the moment that chunk arrives rather than at the end. It is optional
 and backward compatible: a payload that does not begin with the envelope magic is
 simply a file with no name.
+
+The envelope is prepended **before** chunking. It is part of the transfer
+payload: the header's total length field counts it, `dataPages` is computed
+over it, and reassembly reproduces it, after which opening the envelope yields
+the name and the file.
 
 ```
 envelope = "PRNM" (0x50 0x52 0x4E 0x4D)  ||  nameLength (1 byte)  ||  name (UTF-8)  ||  file bytes
@@ -294,7 +318,7 @@ does not run past the payload; and the name contains no control character and no
 | rateless repair-mode byte | `0xFF` |
 | maximum data pages (rateless) | 60000 |
 | page index ceiling (data + parity) | 65535 |
-| maximum file length | `0x7FFFFFFF` bytes (~2 GiB) |
+| maximum transfer payload | `0x7FFFFFFF` bytes (~2 GiB), envelope included |
 | envelope magic | `PRNM` (`0x50 0x52 0x4E 0x4D`) |
 | maximum file name | 200 bytes UTF-8 |
 

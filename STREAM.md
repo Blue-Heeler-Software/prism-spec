@@ -25,9 +25,12 @@ So Prism Stream does not use the fountain. It shares only the symbol layer
 beneath it, which gives it one property worth stating plainly:
 
 > A Prism symbol is Reed-Solomon protected and CRC-32 checked, so a decoded
-> frame is **byte-exact or absent**; there is no such thing as a corrupted one.
-> A stream therefore handles only **erasure**, never corruption. This is why the
-> frame below carries no checksum of its own.
+> frame is byte-exact or absent up to the strength of a 32-bit check: an
+> undetected corruption must survive Reed-Solomon decoding and then pass the
+> CRC by chance, roughly one in four billion per damaged frame. A stream
+> therefore handles **erasure** and treats corruption as negligible, which for
+> disposable audio it is; that is why the frame below carries no checksum of
+> its own, and also why this transport authenticates nothing.
 
 ## 2. Loss, and the redundancy window
 
@@ -84,7 +87,13 @@ are big-endian.
 The packet count `K` MUST be in the range 1 to 200; the upper bound is a
 defensive limit so a malformed count cannot make a reader allocate wildly. The
 frame length MUST be exactly `10 + K * packetBytes`; a payload that does not
-account for every byte is not a Prism Stream frame. A reader distinguishes a
+account for every byte is not a Prism Stream frame.
+
+Unknowns are handled strictly: a payload naming an unknown profile version is
+not a Prism Stream frame and MUST be rejected; a well-formed frame naming an
+unknown codec identifier MUST be ignored whole. The two undefined flag bits
+MUST be sent as zero and MUST be ignored on receipt, so a future revision can
+assign them without breaking receivers already in the field. A reader distinguishes a
 stream frame from an [Aphotic](APHOTIC.md) transfer page and a plain document by
 the magic: `PV` here, `PS` for a transfer page, neither for a document.
 

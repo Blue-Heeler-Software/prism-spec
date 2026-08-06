@@ -26,11 +26,14 @@ shown to work through a camera.
 | format version 2, `b = 1` | 3 | **Proven.** Rock solid on real handsets, and what ships. |
 | format version 2, `b = 2` | 6 | Defined. Has never decoded from a camera, at any pixel density tested, including 40 px per module. |
 | format version 2, `b = 3` | 9 | Defined. Has never decoded from a camera. |
-| format version 3, profiles 1..6 | 4..9 | Implemented and **falsified**. See [BIT-LOADING.md](BIT-LOADING.md). |
+| format version 3, profile 1 | 4 | Implemented and **falsified** on hardware. See [BIT-LOADING.md](BIT-LOADING.md). |
+| format version 3, profiles 2..6 | 5..9 | Defined, untested through a camera. The measured result below leaves them no mechanism by which to work, but they have not themselves been put in front of one. |
 
-Measured directly: **every channel gives out at one bit.** Two bits on any
-single channel fails, red included, so uniform six fails three times over rather
-than once on the weakest channel. Format version 3 exists because that was not
+Measured directly: **every channel gives out at one bit.** Profile 1, red at
+two bits, decodes nothing; an ad-hoc R1 G2 B1 loading, green carrying the
+second bit with the bootstrap held out of it, also decodes nothing. Two bits on
+any tested channel fails, so uniform six fails three times over rather than
+once on the weakest channel. Format version 3 exists because that was not
 known in advance; the machinery is built, tested and inert.
 
 The suspected root cause is not the loading but the **calibration ring itself**.
