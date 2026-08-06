@@ -195,3 +195,32 @@ at any Prism Code and answer "how many bits per module will this setup carry".
 The number is tuned to under-promise: across the simulated capture sweep it never
 claims a depth that then fails to decode, and it frequently claims one less than
 what works.
+
+---
+
+## 3. Matching the reader's rate to the sender
+
+A looping sender ([Aphotic](APHOTIC.md), or any animated Prism transfer) steps
+through its pages at a fixed dwell, and a reader has to keep up. On this link it
+cannot ask the sender to slow down: a display cannot hear the camera watching it,
+so there is no back channel and no negotiation to be had. What a reader can do is
+measure, and adapt itself.
+
+The page index in each transfer header is stamped, at the reader, with the time
+it decoded. The rate that index advances **is** the sender's dwell, learned
+without the sender ever stating it. Against that known rate, the one knob the
+reader owns is its own analysis resolution: decode time scales with the number of
+pixels analysed, so a reader falling behind spends fewer pixels and decodes
+faster, catching every page instead of every third, while a reader that cannot
+resolve the symbol at all spends more.
+
+The rule is deliberately asymmetric. Falling behind is cheap to detect and cheap
+to fix, so it acts quickly. Reading nothing is the more dangerous state, because
+dropping resolution further would make it permanent, so resolution climbs back
+the moment a symbol is seen but will not resolve, and a resolution that produced
+no reads at all is remembered as a floor and not tried again.
+
+None of this is rate negotiation, which a one-way link cannot support. It is the
+reader matching the sender's fixed rate from its own side, and for the fountain
+the sender's exact rate barely matters anyway: a reader that keeps up less well
+simply collects useful coded pages over more laps.

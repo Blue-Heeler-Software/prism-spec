@@ -1,6 +1,6 @@
 # Per-channel bit loading, a proposal for format version 3
 
-Status: implemented in the Kotlin core, and **the premise did not survive
+Status: implemented in the reference codec, and **the premise did not survive
 hardware**. Read the last section before building on any of this. Format
 version 2 and three bits per module remain what ships.
 

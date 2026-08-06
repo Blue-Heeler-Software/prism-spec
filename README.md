@@ -1,25 +1,37 @@
 # Prism Code
 
-Prism Code is an open colour 2D barcode. It stacks several ordinary QR Codes
-into the red, green and blue channels of one symbol, so a single code carries
-several times the data of the black and white QR Code it is built from, while
-staying locatable by an ordinary QR detector.
+Prism Code is an open colour 2D barcode. It stacks several ordinary QR Codes into
+the red, green and blue channels of one symbol, so a single code carries several
+times the data of the black and white QR Code it is built from, while staying
+locatable by an ordinary QR detector.
 
 This repository is the **specification**, published for independent
 implementation and review. The reference implementation lives elsewhere; nothing
 here depends on it.
 
-## The documents
+## The family
 
-- **[FORMAT.md](FORMAT.md)** is the normative specification: exactly what bytes
-  and colours a valid symbol contains. Read this to build an encoder or a
-  decoder.
-- **[DECODER.md](DECODER.md)** describes the reference decoder. It is
-  informative, not normative: an alternative decoder conforms if it recovers the
-  payload the format defines, however it does so internally.
-- **[BIT-LOADING.md](BIT-LOADING.md)** documents per-channel bit loading, a
-  format extension that was implemented and then falsified on real hardware. It
-  is kept so the dead end, and the measurements that closed it, are not lost.
+Three layers, three documents. The symbol format knows nothing of what it
+carries; the payload protocols know nothing of the optics.
+
+- **[FORMAT.md](FORMAT.md)** - the normative symbol format: exactly what bytes
+  and colours one Prism Code contains. Read this to build an encoder or decoder.
+- **[DECODER.md](DECODER.md)** - the reference decoder, informative. How a reader
+  recovers the payload, including calibration, bit-depth estimation, and matching
+  the reader's rate to a sender it cannot talk back to.
+- **[BIT-LOADING.md](BIT-LOADING.md)** - per-channel bit loading, a format
+  extension that was implemented and then falsified on real hardware. Kept so the
+  dead end, and the measurements that closed it, are not lost.
+
+Two payload protocols ride inside Prism symbols and are specified separately, so
+they can never disturb the optical format:
+
+- **[APHOTIC.md](APHOTIC.md)** - a **file** across a sequence of symbols, with
+  rateless fountain repair so a reader that missed pages recovers without the
+  sender ever repeating itself. Complete-file, eventual delivery.
+- **[STREAM.md](STREAM.md)** - a **live stream**, with a redundancy window and a
+  jitter buffer rather than a fountain, and an audio profile on top. Real-time
+  delivery that conceals what it cannot recover in time.
 
 Start with [FORMAT.md](FORMAT.md) section 0, which states plainly which
 configurations are proven through a camera and which are only defined.
@@ -28,10 +40,12 @@ configurations are proven through a camera and which are only defined.
 
 This is a working specification, not yet a frozen standard.
 
-- Format version 2 at one bit per channel is proven on real handsets.
+- The symbol format at one bit per channel, and the Aphotic file transfer on top
+  of it, are proven on real handsets.
 - Higher bit depths, and format version 3's per-channel loading, are defined but
-  have not decoded from a camera. Section 0 of the specification is explicit
-  about this.
+  have not decoded from a camera. Section 0 of the format is explicit about this.
+- Prism Stream's transport is implemented and unit-tested but has not yet been
+  verified end to end through a camera.
 - Canonical conformance vectors do not exist yet. Until they do, no
   implementation can demonstrate interoperability, and the specification says so.
 
@@ -45,10 +59,19 @@ project is not endorsed by or affiliated with the trademark holder, and
 implementers are responsible for their own assessment of any intellectual
 property that applies to QR Code encoding and decoding in their jurisdiction.
 
+## Acknowledgements
+
+The first public revision of these documents incorporates a detailed format
+review by **[NomNomski](https://github.com/NomNomski)**, whose change request
+drove the split of the normative format from the reference decoder, the
+correction of the capacity and calibration arithmetic, the honest accounting of
+proven versus defined configurations, and the separation of the file-transfer and
+streaming protocols into documents of their own.
+
 ## License
 
-This specification is licensed under the Creative Commons Attribution 4.0
-International License (CC BY 4.0). You may share and adapt it, including for
+These specifications are licensed under the Creative Commons Attribution 4.0
+International License (CC BY 4.0). You may share and adapt them, including for
 commercial use, with attribution. See [LICENSE](LICENSE).
 
 SPDX-License-Identifier: CC-BY-4.0

@@ -879,9 +879,34 @@ The Prism payload is arbitrary bytes. Sequencing, fountain coding,
 retransmission, handshakes, latency control, session identity, codec identifiers
 and timing all belong to payload protocols carried **inside** those bytes, and
 MUST NOT cause a change to plane mapping, the calibration ring, the QR
-encoding, the header, the CRCs or symbol geometry. A stream or voice profile is
-a separate document.
+encoding, the header, the CRCs or symbol geometry.
+
+Two such payload protocols are defined as their own documents:
+
+- **[APHOTIC.md](APHOTIC.md)** carries a file across a sequence of symbols, with
+  rateless fountain repair so a reader that missed pages recovers without the
+  sender ever repeating itself. This is complete-file, eventual delivery.
+- **[STREAM.md](STREAM.md)** carries a live, disposable byte stream, with a
+  redundancy window and a jitter buffer rather than a fountain, and an audio
+  profile on top. This is real-time delivery that conceals what it cannot
+  recover in time.
+
+Neither touches this document. A reader tells the three payload kinds apart by
+the first bytes of the decoded payload: `PS` for an Aphotic transfer page, `PV`
+for a Prism Stream frame, and neither for a plain document.
 
 Asymmetric bit depth beyond the defined profiles, luminance compatibility with
 ordinary QR payload decoders, and animated transfer are each a future format
 version or a separate profile, not a clarification of this one.
+
+---
+
+## Acknowledgements
+
+The first public revision of this specification incorporates a detailed format
+review by **NomNomski**, whose change request drove the separation of the
+normative format from the reference decoder, the correction of the capacity and
+calibration-ring arithmetic, the honest accounting of which configurations are
+proven versus merely defined, and the insistence that streaming and voice remain
+payload protocols outside the symbol format. The [APHOTIC.md](APHOTIC.md) and
+[STREAM.md](STREAM.md) companion documents are that separation carried out.
