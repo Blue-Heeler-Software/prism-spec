@@ -47,8 +47,10 @@ This is a working specification, not yet a frozen standard.
   format records the measured envelope.
 - Higher bit depths, and format version 3's per-channel loading, are defined but
   have not decoded from a camera. Section 0 of the format is explicit about this.
-- Prism Stream's transport is implemented and unit-tested but has not yet been
-  verified end to end through a camera.
+- Prism Stream is verified end to end through real cameras: with Codec2 1300
+  inside a version 8 symbol pair, the weakest handset tested streamed
+  contiguous speech from a monitor, and the strongest played minutes with no
+  packets concealed. STREAM.md section 8 has the measurements.
 - Canonical conformance vectors do not exist yet. Until they do, no
   implementation can demonstrate interoperability, and the specification says so.
 

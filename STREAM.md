@@ -5,10 +5,11 @@ Prism Stream carries a live, real-time byte stream over a sequence of
 symbol payload and changes nothing about the symbol format. Audio is its first
 and only defined profile, in section 5.
 
-**Status: the transport is implemented and unit-tested, and has not yet been
-verified end to end through a camera.** The frame format and the receiver logic
-below are proven in software against injected loss; the latency and quality of a
-real optical link are not yet measured.
+**Status: implemented, unit-tested, and verified end to end through real
+cameras.** The frame format and the receiver logic below are proven in software
+against injected loss, and the audio profile has carried live speech from a
+monitor to a fleet of handsets, including contiguous playback on the weakest
+reader tested. Section 8 records what the optical link measured.
 
 ---
 
@@ -54,6 +55,22 @@ playout latency      =  playout buffer depth                     frames
 Deeper recovery buys itself with latency, one for one. This is why Prism Stream
 is a broadcast and push-to-talk medium and not a two-way call, quite apart from
 the link being one-way.
+
+The arithmetic that governs survival is worth stating, because its consequence
+is counterintuitive. If a frame carries a window of `W` packets and each new
+symbol advances the stream by `P` packets, then `W - P` packets of every frame
+are repetition, and a receiver with depth to use them survives
+
+```
+consecutive lost symbols  =  floor(W / P) - 1
+```
+
+`W` is capped by the symbol's byte capacity, so the working lever is `P`, and a
+shorter dwell lowers it. A faster symbol rate therefore makes a MORE robust
+stream, not a less robust one: the display changes more often, but each frame
+repeats more of what came before, so the reader is allowed to miss more of
+them. The first listening tests were lost to the opposite intuition, as was an
+entire preset whose window tolerated nothing.
 
 ## 3. Sequence numbers and sessions
 
@@ -117,12 +134,18 @@ and the frame duration, to reason about latency.
 | id | codec | packet bytes | frame ms | note |
 |---:|-------|-------------:|---------:|------|
 | 0 | AMR narrowband, 4.75 kbit/s | 13 | 20 | the platform speech codec on every mobile handset; needs no separate build |
-| 8 | Codec2 1300 | 7 | 40 | a fifth of the bytes of AMR, the robust target |
+| 8 | Codec2 1300 | 7 | 40 | a fifth of the bytes of AMR; the verified robust default |
 | 9 | Codec2 700C | 4 | 40 | maximum redundancy per byte |
+
+The Codec2 identifiers name the bitstreams as frozen in codec2 release 1.2.0;
+both modes have been stable upstream for many years.
 
 Codec2's low absolute rate is what makes a deep redundancy window affordable:
 the window costs bytes linearly in the codec rate, and a speech codec at 700 to
 1300 bit/s leaves room for seconds of redundancy inside one symbol's payload.
+Measured end to end, that arithmetic is the whole story: the same 311 byte
+symbol payload that carries 460 ms of AMR redundancy carries 1.7 seconds of
+Codec2 1300, and section 8 shows what that difference buys.
 
 > An audio-rate codec is not the only thing a Prism Stream could carry. The
 > transport is codec-agnostic; a future profile could define a different codec
@@ -130,7 +153,26 @@ the window costs bytes linearly in the codec rate, and a speech codec at 700 to
 > explicit timestamp, both omitted here because a fixed-rate codec needs
 > neither, would be added under a new profile version.
 
-## 6. Receiver behaviour (informative)
+## 6. Two symbols, two windows (informative)
+
+A sender with room for two symbols side by side, which is Prism's normal pair
+presentation, should not show the same frame twice, and should not show the
+current frame beside the previous tick's frame either. Both were tried on real
+cameras and both failed. A mirrored pair fails together: the two symbols share
+every captured camera frame, so whatever tears one tears the other, and the
+second symbol adds nothing. Adjacent ticks overlap by all but `P` packets, so
+current-beside-previous adds only the few oldest packets to the pool.
+
+The layout that works places the newest window in one symbol and the window
+BEFORE it in the other: the frame the sender emitted one full window ago, its
+head sequence `W` behind. The two windows overlap not at all, so the pair
+jointly holds twice the depth. A reader that catches only the newer symbol
+still has everything recent; the older symbol matters exactly when frames have
+been missed, which is when depth pays. The older symbol is an ordinary, valid
+frame, so a receiver needs no knowledge of the pairing and the scheme costs
+nothing on the wire.
+
+## 7. Receiver behaviour (informative)
 
 How a receiver turns frames back into a stream is a quality-of-implementation
 matter, not part of the wire format. The reference receiver:
@@ -145,6 +187,70 @@ matter, not part of the wire format. The reference receiver:
   flush that begins playback immediately with whatever depth is available;
 - resyncs toward the intended latency if it falls too far behind, so buffer size
   and latency stay bounded under a fast source or a catch-up burst.
+
+Beyond those basics, four behaviours separated a receiver that measured well
+from one that audibly failed, and each was learned from a failure:
+
+- **The playout clock is the audio sink's own playback position** and nothing
+  else. Every proxy tried, sleeping per packet, or letting a full sink's
+  blocking write pace the loop, ran slow on some handset and fast on another,
+  and either drains the buffer flat or grows it without bound.
+- **The live edge is not a hole.** A receiver that has consumed everything it
+  holds must wait for the next frame, not conceal; concealing there inserts
+  time the stream never contained, and the inserted time compounds until the
+  playout has drifted beyond its own resync. A hole BEHIND the live edge is
+  real loss and is the thing to conceal.
+- **The resync threshold needs slack above the buffer depth.** Frames arrive
+  in bursts of `P` packets, so the buffered depth brushes its target on every
+  arrival; a threshold set exactly at the target fires rhythmically and clips
+  audio that was merely punctual.
+- **The buffer depth is a constant of the receiver, not of the first frame.**
+  A receiver that sizes its buffer from the first frame it happens to decode
+  will, when it catches a stream in its opening seconds, freeze that accident
+  in as its latency and its loss tolerance for the whole session.
+
+One case deserves its own paragraph. A recorded broadcast played again arrives
+with the SAME session id and its sequence rewound, because the id was chosen
+when the recording was rendered. A receiver that treats every backward
+sequence as the past will wedge: each replayed packet lands behind the
+playhead and is dropped, forever, while the arriving frames keep the session
+alive. The reference receiver treats a backward head jump too large for any
+redundancy window (it uses 600 packets) as a restart and resets in place, as
+if the session were new. Small backward jumps are normal and must not reset:
+the older symbol of a pair and ordinary frame reordering both produce them.
+
+## 8. What the optical link measured (informative)
+
+One rig, one fleet, one afternoon; recorded so the next implementer knows what
+to expect, not as a promise. The rig was a 1080p monitor showing the pair with
+the phones on a stand: the strongest reader a recent flagship, the weakest a
+budget handset that manages roughly two full-resolution decode attempts a
+second.
+
+- **AMR 4.75 in a version 8 symbol**, 23 packet window, 120 ms dwell,
+  tolerance 2: the flagship played with 7 to 13 percent of packets concealed,
+  audible as occasional dropouts in otherwise continuous audio.
+- **Codec2 1300 in the same symbol**, 43 packet window, tolerance 13: minutes
+  of playback with ZERO packets concealed on the flagship, and the weakest
+  reader in the fleet, held still, streamed contiguous speech. The first
+  fully clean runs the project produced.
+- **A version 12 symbol was tried for depth first, and falsified.** Its window
+  is deeper still, but its smaller modules cost the readers so many decode
+  attempts that playback went stop-start with nothing concealed: depth works,
+  and module size starves it. Depth in the easiest symbol beats capacity in a
+  harder one, and the codec rate, not the symbol size, is the right place to
+  buy it.
+- **Two reader behaviours dominated everything else** once the transport was
+  correct. The reader must attempt decodes at least as often as symbols
+  change, which for a reader that also serves slower duties means streaming
+  must claim the same priority as an active transfer; and continuous
+  autofocus must be locked while reading is going well, because focus hunting
+  tears holes of several seconds that no affordable window covers.
+
+A note on content: a 1300 bit/s vocoder models a human vocal tract, and it
+carries speech intelligibly and music as mush. For music, AMR at the shallower
+window is the better trade when the link is good. The deep window is for what
+the medium is for: a voice, delivered as light, surviving a shaky camera.
 
 ---
 
