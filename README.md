@@ -20,8 +20,9 @@ carries; the payload protocols know nothing of the optics.
   recovers the payload, including calibration, bit-depth estimation, and matching
   the reader's rate to a sender it cannot talk back to.
 - **[BIT-LOADING.md](BIT-LOADING.md)** - per-channel bit loading, a format
-  extension that was implemented and then falsified on real hardware. Kept so the
-  dead end, and the measurements that closed it, are not lost.
+  extension whose first profile was implemented and falsified on real hardware;
+  the remaining profiles are implemented but untested. Kept so the dead end, and
+  the measurements that closed it, are not lost.
 
 Two payload protocols ride inside Prism symbols and are specified separately, so
 they can never disturb the optical format:

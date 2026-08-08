@@ -44,22 +44,26 @@ them, up to the window's depth.
 The one honest cost is latency. All redundancy is of **past** data, because the
 future has not been produced yet, so recovering a lost packet from a later
 frame's copy means the receiver must not have played it yet. The recoverable
-outage is therefore the smaller of two depths, the sender's redundancy window
-and the receiver's playout buffer, and both cost delay:
+outage is therefore bounded by two depths at once, the sender's redundancy
+window and the receiver's playout buffer, and both cost delay.
+
+Units, precisely, since an earlier draft mixed them: `W` is the window depth
+in **packets**, `B` the playout buffer depth in **packets**, and `P` the
+packets of fresh audio each new symbol advances, so outages are measured in
+**consecutive lost symbols**:
 
 ```
-recoverable outage  =  min(window depth, playout buffer depth)  frames
-playout latency      =  playout buffer depth                     frames
+recoverable outage  =  min(floor(W / P) - 1, floor(B / P))  lost symbols
+playout latency     =  B                                    packets
 ```
 
 Deeper recovery buys itself with latency, one for one. This is why Prism Stream
 is a broadcast and push-to-talk medium and not a two-way call, quite apart from
 the link being one-way.
 
-The arithmetic that governs survival is worth stating, because its consequence
-is counterintuitive. If a frame carries a window of `W` packets and each new
-symbol advances the stream by `P` packets, then `W - P` packets of every frame
-are repetition, and a receiver with depth to use them survives
+The window half of that bound deserves its own statement, because its
+consequence is counterintuitive. `W - P` packets of every frame are
+repetition, so a receiver whose buffer is deep enough survives
 
 ```
 consecutive lost symbols  =  floor(W / P) - 1
@@ -125,6 +129,12 @@ The talkspurt flag is a hint a receiver uses to reset codec state and show that
 the source is active. It rides several consecutive frames rather than one, so a
 single torn frame cannot swallow it.
 
+Flags describe the stream at the frame's **head sequence**, not at the moment
+of display. A sender that emits deliberately delayed frames, such as the older
+symbol of the pair in section 6, MUST clear the hint flags on them, so a stale
+talkspurt cannot reset a receiver's codec state mid-word; the reference sender
+sends the older symbol with a zero flag nibble.
+
 ## 5. The audio profile
 
 The only codec identifiers defined so far carry speech. The transport never
@@ -137,8 +147,19 @@ and the frame duration, to reason about latency.
 | 8 | Codec2 1300 | 7 | 40 | a fifth of the bytes of AMR; the verified robust default |
 | 9 | Codec2 700C | 4 | 40 | maximum redundancy per byte |
 
-The Codec2 identifiers name the bitstreams as frozen in codec2 release 1.2.0;
-both modes have been stable upstream for many years.
+The packet bytes are normative, exactly:
+
+- **AMR** packets are the 13-byte storage-format frame of RFC 4867 section
+  5.3: the table-of-contents byte first (`0x04` for mode 0, quality bit set),
+  then the 95 payload bits packed into 12 bytes with the padding bits zero. A
+  packet whose table-of-contents byte names any other mode is not a valid
+  packet for codec identifier 0.
+- **Codec2** packets are the packed bitstream `codec2_encode` emits and
+  `codec2_decode` consumes, as frozen in codec2 release 1.2.0: bits packed
+  most-significant-bit first into `ceil(bits/8)` bytes, 52 bits in 7 bytes
+  for 1300 and 28 bits in 4 bytes for 700C. Padding bits MUST be sent as zero
+  and MUST be ignored on receipt. Both bitstreams have been stable upstream
+  for many years.
 
 Codec2's low absolute rate is what makes a deep redundancy window affordable:
 the window costs bytes linearly in the codec rate, and a speech codec at 700 to

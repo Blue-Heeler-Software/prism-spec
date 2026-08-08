@@ -908,7 +908,7 @@ Format versions defined so far:
 | version | adds | status |
 |--------:|------|--------|
 | 2 | uniform bit depth 1..3 | current, and the only version proven through a camera at `b = 1` |
-| 3 | per-channel loading profiles | implemented, falsified on hardware, retained so the machinery and its measurements are not lost |
+| 3 | per-channel loading profiles | profile 1 falsified on hardware; profiles 2 to 6 implemented but untested; retained so the machinery and its measurements are not lost |
 
 Support for format version 2 is mandatory for any reader claiming conformance
 and will not be withdrawn without a deprecation notice in a published revision.

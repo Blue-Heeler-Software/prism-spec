@@ -92,9 +92,13 @@ from the page index, and a reader MUST reject a page whose chunk size, data
 page count, repair mode or total length disagrees with the transfer already in
 progress: such a page is a corrupt read that survived its checks, or two
 senders colliding on an id, and mixing it in would poison a reassembly that
-carries no checksum of its own. A reader SHOULD also reject a transfer whose
-fields are internally inconsistent, `dataPages != ceil(totalLength / chunkSize)`
-being the canonical check.
+carries no checksum of its own. A reader MUST also reject a page whose fields
+are internally inconsistent: `dataPages` MUST equal
+`ceil(totalLength / chunkSize)` exactly. A count too small truncates the file;
+a count too large drives the repair arithmetic and the completion test with
+pages that can never arrive, so the transfer wedges. Either way the header is
+lying about its own shape, and no later page can repair a transfer built on
+it.
 
 `chunkSize` MUST be at least 32 bytes.
 
